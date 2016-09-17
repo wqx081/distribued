@@ -1,0 +1,8 @@
+syntax = "proto3";
+package mr;
+
+message ConfigProto {
+  map<string, int32> device_count = 1;
+  int64 operation_timeout_in_ms = 2;
+  bool use_per_session_threads = 3;
+}

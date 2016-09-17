@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package mr;
+
+enum BusAdjacency {
+  BUS_0 = 0;
+  BUS_1 = 1;
+  BUS_ANY = 2;
+  BUS_NUM_ADJACENCIES = 3;
+};
+
+message DeviceAttributes {
+  string name = 1;
+
+  string device_type = 2;
+
+  int64 memory_limit = 4;
+
+  BusAdjacency bus_adjacency = 5;
+
+  fixed64 incarnation = 6;
+
+  string physical_device_desc = 7;
+}

@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+// import "config.proto"
+
+package mr;
+
+// 本文件包含TensorFlow 集群(cluster)的定义, 以及集群里的服务(server) 定义.
+//
+// 例子:
+//
+// 1. 单处理器集群, 包含 "/job:local/task:0".
+//
+//	Cluster:
+//	  job { name: 'local' tasks { key: 0 value: 'localhost:2222' } }
+//	
+//	Server:
+//	  cluster { $CLUSTER } job_name: 'local' task_index: 0
+//
+// 2. 双处理器集群, 包含 "/job:local/task:{0,1}".
+//
+//	Cluster:
+//	  job { name: 'local' tasks { key: 0 value: 'localhost:2222' }
+//                            tasks { key: 1 value: 'localhost:2223' } }
+//
+//	Servers:
+//	  cluster { $CLUSTER } job_name: 'local' task_index: 0
+//	  cluster { $CLUSTER } job_name: 'local' task_index: 1
+//
+// 3. 双任务集群， 包含 "/job:worker/task:{0,1,2}" and
+//                      "/job:ps/task:{0,1}". 
+
+message JobDef {
+  string name = 1;
+  map<int32, string> tasks = 2;
+}
+
+message ClusterDef {
+  repeated JobDef job = 1;
+}
+
+message ServerDef {
+  ClusterDef cluster = 1;
+  string job_name = 2;
+  int32 task_index = 3;
+  // TODO(wqx):
+  // ConfigProto default_session_config = 4;
+  //
+  string default_session_config = 4;
+
+  string protocol = 5;  
+}
