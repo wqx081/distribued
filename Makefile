@@ -13,6 +13,7 @@ PROTOS_PATH = ./protos
 
 CPP_SOURCES := \
 	./core/base/status.cc \
+	./core/base/mem.cc \
 	./core/base/threadpool.cc \
 	\
 	./core/strings/ordered_code.cc \
@@ -49,6 +50,8 @@ CPP_OBJECTS := $(CPP_SOURCES:.cc=.o)
 
 TESTS := \
 	./unittests/dr/mr_server_unittest \
+	./unittests/core/threadpool_unittest \
+
 
 
 all: $(CPP_OBJECTS) $(TESTS)
@@ -66,6 +69,20 @@ all: $(CPP_OBJECTS) $(TESTS)
 	./unittests/dr/mr_server_unittest.cc
 	@echo "  [CXX]  $@"
 	@$(CXX) $(CXXFLAGS) $@ $<
+
+./unittests/core/threadpool_unittest: \
+	./unittests/core/threadpool_unittest.o \
+	./core/base/threadpool.h \
+	./core/base/threadpool.o \
+	./core/base/thread/device_thread_pool.h \
+	./core/base/thread/simple_thread_pool.h 
+	@echo "  [LINK] $@"
+	@$(CXX) -o $@ $< $(CPP_OBJECTS) $(LIB_FILES) $(TEST_LIB_FILES)
+./unittests/core/threadpool_unittest.o: \
+	./unittests/core/threadpool_unittest.cc
+	@echo "  [CXX]  $@"
+	@$(CXX) $(CXXFLAGS) $@ $<
+
 
 ## /////////////////////////////
 

@@ -1,4 +1,5 @@
 #include "core/base/threadpool.h"
+#include "core/system/env.h"
 
 #include <deque>
 #include <thread>
@@ -9,9 +10,122 @@
 
 #include "core/base/logging.h"
 
+// IF USE EIGEN_USE_THREADS
+#include "core/base/thread/device_thread_pool.h"
+#include "core/base/thread/cost_model.h"
+
+#include "core/system/context.h"
+
 namespace mr {
 namespace thread {
 
+
+// IF USE EIGEN_USE_THREADS
+
+struct EigenEnvironment {
+
+  typedef mr::Thread EnvThread;
+  struct TaskImpl {
+    std::function<void()> f;
+    Context context;
+    //Not Used Yet
+    uint64_t trace_id;
+  };
+  struct Task {
+    std::unique_ptr<TaskImpl> f;
+  };
+  
+  Env* const env_;
+  const ThreadOptions thread_options_;
+  const string name_;
+  
+  EigenEnvironment(Env* env, const ThreadOptions& thread_options,
+                   const string& name)
+    : env_(env), thread_options_(thread_options), name_(name) {}
+  
+  EnvThread* CreateThread(std::function<void()> f) {
+    return env_->StartThread(thread_options_, name_, [=]() {
+        //port::ScopedFlushDenormal flush;
+      f();
+    });
+  }
+
+  Task CreateTask(std::function<void()> f) {
+    uint64_t id = 0;
+#if 0
+    if (port::Tracing::IsActive()) {
+        id = port::Tracing::UniqueId();
+        port::Tracing::RecordEvent(port::Tracing::EventCategory::kScheduleClosure,
+                                                                      id);
+    }
+#endif
+      return Task{
+          std::unique_ptr<TaskImpl>(new TaskImpl{
+              std::move(f), mr::Context(mr::ContextKind::kThread), id,
+          }),
+      };
+    }
+  
+  void ExecuteTask(const Task& t) {
+    WithContext wc(t.f->context);
+    if (t.f->trace_id != 0) {
+      //port::Tracing::ScopedActivity region(
+      //port::Tracing::EventCategory::kRunClosure, t.f->trace_id);
+        t.f->f();
+      } else {
+        t.f->f();
+      }
+    }
+};
+
+struct ThreadPool::Impl : eigen::ThreadPoolTempl<EigenEnvironment> {
+    Impl(Env* env, const ThreadOptions& thread_options, const string& name,
+                  int num_threads)
+        : eigen::ThreadPoolTempl<EigenEnvironment>(
+              num_threads, EigenEnvironment(env, thread_options, name)) {}
+  
+    void ParallelFor(int64_t total, int64_t cost_per_unit,
+                     std::function<void(int64_t, int64_t)> fn) {
+      CHECK_GE(total, 0);
+      CHECK_EQ(total, (int64_t)(eigen::Index)total);
+      eigen::ThreadPoolDevice device(this, this->NumThreads());
+      device.ParallelFor(total, eigen::OpCost(0, 0, cost_per_unit),
+          [&fn](eigen::Index first, eigen::Index last) { fn(first, last); });
+  }
+};
+  
+
+//////////////////////////
+//
+ThreadPool::ThreadPool(Env* env, const string& name, int num_threads)
+      : ThreadPool(env, ThreadOptions(), name, num_threads) {}
+      
+  ThreadPool::ThreadPool(Env* env, const ThreadOptions& thread_options,
+                         const string& name, int num_threads) {
+  CHECK_GE(num_threads, 1);
+  impl_.reset(
+        new ThreadPool::Impl(env, thread_options, "mr_" + name, num_threads));
+}     
+  
+ThreadPool::~ThreadPool() {}
+  
+void ThreadPool::Schedule(std::function<void()> fn) {
+  CHECK(fn != nullptr);
+  impl_->Schedule(std::move(fn));
+} 
+  
+void ThreadPool::ParallelFor(int64_t total, int64_t cost_per_unit,
+                             std::function<void(int64_t, int64_t)> fn) {
+  impl_->ParallelFor(total, cost_per_unit, std::move(fn));
+} 
+  
+int ThreadPool::NumThreads() const { return impl_->NumThreads(); }
+  
+int ThreadPool::CurrentThreadId() const { return impl_->CurrentThreadId(); }
+
+
+// IF NOT USE EIGEN_USE_THREADS
+#if 0
 struct ThreadPool::Impl {
   Impl(Env* env, const ThreadOptions& thread_options, const string& name,
        int num_threads);
@@ -132,6 +246,7 @@ void ThreadPool::Schedule(std::function<void()> fn) {
   CHECK(fn != nullptr);
   impl_->Schedule(std::move(fn));
 }
+#endif
 
 }  // namespace thread
-}  // namespace tensorflow
+}  // namespace core

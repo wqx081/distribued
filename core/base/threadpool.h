@@ -19,6 +19,11 @@ class ThreadPool {
   ~ThreadPool();
 
   void Schedule(std::function<void()> fn);
+  void ParallelFor(int64_t total,
+                   int64_t cost_per_unit,
+                   std::function<void(int64_t, int64_t)> fn);
+  int NumThreads() const;
+  int CurrentThreadId() const;
 
   struct Impl;
 
